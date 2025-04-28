@@ -21,7 +21,8 @@
 # SOFTWARE.
 
 
-from .single import Hover, Track, FlyThrough
+# from .single import Hover, Track, FlyThrough
+from .single import Hover, SingleJuggleVolleyball
 from .payload import PayloadHover, PayloadTrack, PayloadFlyThrough
 from .inv_pendulum import InvPendulumHover, InvPendulumTrack, InvPendulumFlyThrough
 from .dragon import DragonHover
@@ -31,10 +32,10 @@ from .formation import Formation
 from .rearrange import Rearrange
 from .isaac_env import IsaacEnv
 
-try:
-    from .single import Forest, Pinball
-except ModuleNotFoundError:
-    print(
-        "To run the environments which use `ContactSensor` and `RayCaster`,"
-        "please install Isaac Lab (https://github.com/isaac-sim/IsaacLab)."
-    )
+# try:
+#     from .single import Forest, Pinball
+# except ModuleNotFoundError:
+#     print(
+#         "To run the environments which use `ContactSensor` and `RayCaster`,"
+#         "please install Isaac Lab (https://github.com/isaac-sim/IsaacLab)."
+#     )

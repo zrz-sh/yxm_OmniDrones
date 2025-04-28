@@ -1,7 +1,7 @@
 name: sac
 
 buffer_size: 1_000_000
-train_every: 64
+train_every: 128
 batch_size: 4096
 gamma: 0.95
 tau: 0.005

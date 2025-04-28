@@ -9,7 +9,7 @@ import pandas as pd
 import wandb
 import matplotlib.pyplot as plt
 
-from torch.func import vmap
+from functorch import vmap
 from tqdm import tqdm
 from omegaconf import OmegaConf
 
@@ -41,7 +41,7 @@ def main(cfg):
     run = init_wandb(cfg)
     setproctitle(run.name)
     print(OmegaConf.to_yaml(cfg))
-
+    print("xbt train")
     from omni_drones.envs.isaac_env import IsaacEnv
 
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
@@ -59,7 +59,8 @@ def main(cfg):
         transforms.append(transform)
 
     # optionally discretize the action space or use a controller
-    action_transform: str = cfg.task.get("action_transform", None)
+    action_transform: str = cfg.algo.get("action_transform", None)
+    print("action_transform", action_transform)
     if action_transform is not None:
         if action_transform.startswith("multidiscrete"):
             nbins = int(action_transform.split(":")[1])
@@ -74,14 +75,10 @@ def main(cfg):
 
     env = TransformedEnv(base_env, Compose(*transforms)).train()
     env.set_seed(cfg.seed)
-
+    agent_spec: AgentSpec = env.agent_spec["drone"]
     try:
         policy = ALGOS[cfg.algo.name.lower()](
-            cfg.algo,
-            env.observation_spec,
-            env.action_spec,
-            env.reward_spec,
-            device=base_env.device
+        cfg.algo, agent_spec=agent_spec, device="cuda"
         )
     except KeyError:
         raise NotImplementedError(f"Unknown algorithm: {cfg.algo.name}")

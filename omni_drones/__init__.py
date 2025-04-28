@@ -24,7 +24,7 @@
 import os
 
 import torch
-from isaacsim import SimulationApp
+from omni.isaac.kit import SimulationApp
 from tensordict import TensorDict
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), os.path.pardir, "cfg")

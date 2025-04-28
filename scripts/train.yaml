@@ -20,16 +20,20 @@ viewer:
   eye: [8, 0., 6.]
   lookat: [0., 0., 1.]
 
+usd_path: /home/zelai/projects/OmniDrones/omni_drones/envs/assets/default_environment.usd
+
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}
+  run_name: ${oc.select:..task.name,test}-seed${oc.select:..seed,none}-${oc.select:..algo.name,none}
+  # run_name: ${oc.select:..task.name,test}-shaping=${oc.select:..task.reward_shaping,none}-seed${oc.select:..seed,none}-${oc.select:..algo.name,none}
   job_type: train
-  entity:
+  entity: nics_marl
   project: omnidrones
   mode: online # set to 'disabled' when debugging locally
   run_id:
   monitor_gym: True
   tags:
+  WANDB_API_KEY : 853ccd594b6cb6b8955900d478f3f3384f64383d
 
 defaults:
   - task: Hover

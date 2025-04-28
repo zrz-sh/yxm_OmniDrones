@@ -158,33 +158,86 @@ class PayloadFlyThrough(IsaacEnv):
         self.drone_traj_vis = []
 
     def _design_scene(self):
-        drone_model_cfg = self.cfg.task.drone_model
-        self.drone, self.controller = MultirotorBase.make(
-            drone_model_cfg.name, drone_model_cfg.controller
-        )
+        drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
+        cfg = drone_model.cfg_cls()
+        self.drone: MultirotorBase = drone_model(cfg=cfg)
+        print("xbt design scene")
+        # target_vis_prim = prim_utils.create_prim(
+        #     prim_path="/World/envs/env_0/target",
+        #     usd_path=self.drone.usd_path,
+        #     translation=(0.0, 0.0, 2.),
+        # )
 
-        kit_utils.create_ground_plane(
-            "/World/defaultGroundPlane",
-            static_friction=1.0,
-            dynamic_friction=1.0,
-            restitution=0.0,
-        )
+        # kit_utils.set_nested_collision_properties(
+        #     target_vis_prim.GetPath(), 
+        #     collision_enabled=False
+        # )
+        # kit_utils.set_nested_rigid_body_properties(
+        #     target_vis_prim.GetPath(),
+        #     disable_gravity=True
+        # )
 
-        create_obstacle(
-            "/World/envs/env_0/obstacle_0",
-            prim_type="Capsule",
-            translation=(0., 0., 1.2),
-            attributes={"axis": "Y", "radius": 0.04, "height": 5}
-        )
-        create_obstacle(
-            "/World/envs/env_0/obstacle_1",
-            prim_type="Capsule",
-            translation=(0., 0., 2.2),
-            attributes={"axis": "Y", "radius": 0.04, "height": 5}
-        )
+        if self.usd_path:
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+                usd_path=self.usd_path
+            )
+            create_obstacle(
+                "/World/envs/env_0/obstacle_0", 
+                prim_type="Capsule",
+                translation=(0., 0., 1.2),
+                attributes={"axis": "Y", "radius": 0.04, "height": 5}
+            )
+            create_obstacle(
+                "/World/envs/env_0/obstacle_1", 
+                prim_type="Capsule",
+                translation=(0., 0., 2.2),
+                attributes={"axis": "Y", "radius": 0.04, "height": 5}
+            )
+        else:
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+            )
+            create_obstacle(
+                "/World/envs/env_0/obstacle_0", 
+                prim_type="Capsule",
+                translation=(0., 0., 1.2),
+                attributes={"axis": "Y", "radius": 0.04, "height": 5}
+            )
+            create_obstacle(
+                "/World/envs/env_0/obstacle_1", 
+                prim_type="Capsule",
+                translation=(0., 0., 2.2),
+                attributes={"axis": "Y", "radius": 0.04, "height": 5}
+            )
+        # kit_utils.create_ground_plane(
+        #     "/World/defaultGroundPlane",
+        #     static_friction=1.0,
+        #     dynamic_friction=1.0,
+        #     restitution=0.0,
+        # )
+        
+        # create_obstacle(
+        #     "/World/envs/env_0/obstacle_0", 
+        #     prim_type="Capsule",
+        #     translation=(0., 0., 1.2),
+        #     attributes={"axis": "Y", "radius": 0.04, "height": 5}
+        # )
+        # create_obstacle(
+        #     "/World/envs/env_0/obstacle_1", 
+        #     prim_type="Capsule",
+        #     translation=(0., 0., 2.2),
+        #     attributes={"axis": "Y", "radius": 0.04, "height": 5}
+        # )
 
-        self.drone.spawn(translations=[(0.0, 0.0, 2.)])
-        attach_payload(f"/World/envs/env_0/{self.drone.name}_0", self.cfg.task.bar_length)
+        # self.drone.spawn(translations=[(0.0, 0.0, 2.)])
+        # attach_payload(f"/World/envs/env_0/{self.drone.name}_0", self.cfg.task.bar_length)
 
         sphere = objects.DynamicSphere(
             "/World/envs/env_0/target",
@@ -194,6 +247,9 @@ class PayloadFlyThrough(IsaacEnv):
         )
         kit_utils.set_collision_properties(sphere.prim_path, collision_enabled=False)
         kit_utils.set_rigid_body_properties(sphere.prim_path, disable_gravity=True)
+
+        drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 2.)])[0]
+        attach_payload(drone_prim.GetPath().pathString, self.cfg.task.bar_length)
         return ["/World/defaultGroundPlane"]
 
     def _set_specs(self):

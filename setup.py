@@ -2,20 +2,24 @@ from setuptools import find_packages, setup
 
 setup(
     name="omni_drones",
-    version="0.1.1",
-    author="btx0424@SUSTech",
+    author="zrz",
     keywords=["robotics", "rl"],
     packages=find_packages("."),
     install_requires=[
         "hydra-core",
         "omegaconf",
         "wandb",
+        "moviepy",
         "imageio",
         "plotly",
         "einops",
+        "av", # for moviepy
         "pandas",
-        "moviepy",
-        "av",
-        "torchrl==0.3.1", # for torch==2.2.2
+        # "multielo @ git+https://github.com/djcunningham0/multielo.git@v0.4.0",
+        "h5py",
+        "filterpy",
+        "usd-core==23.2",
+        # "torchinfo",
+        # "torchopt"
     ],
 )

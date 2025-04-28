@@ -87,8 +87,11 @@ class ArticulationView(_ArticulationView):
             physics_sim_view.set_subspace_roots("/")
         carb.log_info("initializing view for {}".format(self._name))
         # TODO: add a callback to set physics view to None once stop is called
+        # self._physics_view = physics_sim_view.create_articulation_view(
+        #     [x.replace(".*", "*") for x in self._regex_prim_paths]
+        # )
         self._physics_view = physics_sim_view.create_articulation_view(
-            [x.replace(".*", "*") for x in self._regex_prim_paths]
+            self._regex_prim_paths.replace(".*", "*"), self._enable_dof_force_sensors
         )
         assert self._physics_view.is_homogeneous
         self._physics_sim_view = physics_sim_view

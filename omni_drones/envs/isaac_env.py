@@ -131,6 +131,7 @@ class IsaacEnv(EnvBase):
         if not prim_utils.is_prim_path_valid(self.template_env_ns):
             prim_utils.define_prim(self.template_env_ns)
         # setup single scene
+        self.usd_path = cfg.get("usd_path")
         global_prim_paths = self._design_scene()
         # check if any global prim paths are defined
         if global_prim_paths is None:

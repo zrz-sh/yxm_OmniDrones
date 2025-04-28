@@ -12,7 +12,7 @@ env:
 
 drone_model:
   name: Hummingbird
-  controller: LeePositionController
+  # controller: LeePositionController
 
 time_encoding: true
 

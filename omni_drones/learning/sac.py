@@ -82,7 +82,7 @@ class SACPolicy(object):
 
         self.policy_in_keys = [self.obs_name]
         self.policy_out_keys = [self.act_name, f"{self.agent_spec.name}.logp"]
-
+        print("xbt sac")
         if self.cfg.share_actor:
             self.actor = TensorDictModule(
                 Actor(
