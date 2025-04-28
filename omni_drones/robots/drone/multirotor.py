@@ -45,11 +45,14 @@ from collections import defaultdict
 
 import pprint
 
+@dataclass
+class MultirotorCfg(RobotCfg):
+    force_sensor: bool = False
 
 class MultirotorBase(RobotBase):
 
     param_path: str
-
+    cfg_cls = MultirotorCfg
     def __init__(
         self,
         name: str = None,
@@ -74,7 +77,14 @@ class MultirotorBase(RobotBase):
             "drag_coef": UnboundedContinuousTensorSpec(1),
         }).to(self.device)
 
-        state_dim = 19 + self.num_rotors
+        if self.cfg.force_sensor:
+            self.use_force_sensor = True
+            state_dim = 19 + self.num_rotors + 6
+        else:
+            self.use_force_sensor = False
+            state_dim = 19 + self.num_rotors
+
+    
         self.state_spec = UnboundedContinuousTensorSpec(state_dim, device=self.device)
         self.randomization = defaultdict(dict)
 
@@ -300,7 +310,19 @@ class MultirotorBase(RobotBase):
         self.heading[:] = quat_axis(self.rot, axis=0)
         self.up[:] = quat_axis(self.rot, axis=2)
         state = [self.pos, self.rot, self.vel, self.heading, self.up, self.throttle * 2 - 1]
-
+        if self.use_force_sensor:
+            self.force_readings, self.torque_readings = self.get_force_sensor_forces().chunk(2, -1)
+            # normalize by mass and inertia
+            force_reading_norms = self.force_readings.norm(dim=-1, keepdim=True)
+            force_readings = (
+                self.force_readings
+                / force_reading_norms
+                * symlog(force_reading_norms)
+                / self.gravity.unsqueeze(-2)
+            )
+            torque_readings = self.torque_readings / self.INERTIA_0.unsqueeze(-2)
+            state.append(force_readings.flatten(-2))
+            state.append(torque_readings.flatten(-2))
         state = torch.cat(state, dim=-1)
         if check_nan:
             assert not torch.isnan(state).any()

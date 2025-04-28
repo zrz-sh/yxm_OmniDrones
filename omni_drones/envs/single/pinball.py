@@ -40,7 +40,7 @@ from torchrl.data import (
 )
 from pxr import UsdShade, PhysxSchema
 
-from omni.isaac.lab.sensors import ContactSensorCfg, ContactSensor
+from omni.isaac.orbit.sensors import ContactSensorCfg, ContactSensor
 
 class Pinball(IsaacEnv):
     """
@@ -119,10 +119,13 @@ class Pinball(IsaacEnv):
         self.alpha = 0.8
 
     def _design_scene(self):
-        drone_model_cfg = self.cfg.task.drone_model
-        self.drone, self.controller = MultirotorBase.make(
-            drone_model_cfg.name, drone_model_cfg.controller
-        )
+        drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
+        cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
+        self.drone: MultirotorBase = drone_model(cfg=cfg)
+        # drone_model_cfg = self.cfg.task.drone_model
+        # self.drone, self.controller = MultirotorBase.make(
+        #     drone_model_cfg.name, drone_model_cfg.controller
+        # )
 
         material = materials.PhysicsMaterial(
             prim_path="/World/Physics_Materials/physics_material_0",
@@ -137,13 +140,29 @@ class Pinball(IsaacEnv):
         )
         cr_api = PhysxSchema.PhysxContactReportAPI.Apply(ball.prim)
         cr_api.CreateThresholdAttr().Set(0.)
-
-        kit_utils.create_ground_plane(
-            "/World/defaultGroundPlane",
-            static_friction=1.0,
-            dynamic_friction=1.0,
-            restitution=0.0,
-        )
+        if self.usd_path:
+            # use local usd resources
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+                usd_path=self.usd_path
+            )
+        else:
+            # use online usd resources
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+            )
+        # kit_utils.create_ground_plane(
+        #     "/World/defaultGroundPlane",
+        #     static_friction=1.0,
+        #     dynamic_friction=1.0,
+        #     restitution=0.0,
+        # )
         drone_prims = self.drone.spawn(translations=[(0.0, 0.0, 2.)])
         material = UsdShade.Material(material.prim)
         for drone_prim in drone_prims:
@@ -179,9 +198,9 @@ class Pinball(IsaacEnv):
 
         self.agent_spec["drone"] = AgentSpec(
             "drone", 1,
-            observation_key="drone.obs",
-            action_key="drone.action",
-            reward_key="drone.reward",
+            observation_key=("agents", "observation"),
+            action_key=("agents", "action"),
+            reward_key=("agents", "reward"),
         )
 
         stats_spec = CompositeSpec({

@@ -26,4 +26,4 @@ from .track import Track
 from .fly_through import FlyThrough
 from .singlejuggle import SingleJuggleVolleyball
 # from .forest import Forest
-# from .pinball import Pinball
+from .pinball import Pinball

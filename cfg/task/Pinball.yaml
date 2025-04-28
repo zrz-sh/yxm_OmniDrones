@@ -15,5 +15,5 @@ drone_model:
   controller: LeePositionController
 
 time_encoding: true
-
+force_sensor: false
 action_transform: null

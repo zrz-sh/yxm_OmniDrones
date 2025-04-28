@@ -457,7 +457,7 @@ class SingleJuggleVolleyball(IsaacEnv):
                     "agents": CompositeSpec(
                         {
                             "observation": UnboundedContinuousTensorSpec(
-                                (1, observation_dim) # 2 drones
+                                (1, observation_dim) # 1 drones
                             ),
                         }
                     )
@@ -958,11 +958,14 @@ class SingleJuggleVolleyball(IsaacEnv):
         above_min_height_reward = (self.ball_z_max / (self.num_true_hits - 1).clamp(min=1e-5)) > self.min_height
         reward_ball_height = 3 * (true_hit & above_min_height_reward).float()  # (E, 1)
         # print("reward_ball_height", reward_ball_height)
-        reward_success_hit = true_hit.any(-1, keepdim=True).float()  # (E, 1)
+        # reward_success_hit = true_hit.any(-1, keepdim=True).float()  # (E, 1)
+        hit = self.contact_sensor.data.net_forces_w.any(-1).float()
+        reward_success_hit = hit.any(-1, keepdim=True).float()  # (E, 1)
         # print("reward_success_hit", reward_success_hit)
         step_reward = reward_ball_height + reward_success_hit - penalty_anchor
         # conditional_reward = reward_score - angular_penalty
-        end_penalty = - penalty_wrong_hit - penalty_drone_misbehave - penalty_ball_misbehave
+        # end_penalty = - penalty_wrong_hit - penalty_drone_misbehave - penalty_ball_misbehave
+        end_penalty = - penalty_drone_misbehave - penalty_ball_misbehave
 
         # reward: torch.Tensor = step_reward + conditional_reward + end_penalty  # (E,2)
         reward: torch.Tensor = step_reward + end_penalty  # (E,2)
