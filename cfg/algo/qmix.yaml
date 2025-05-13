@@ -15,7 +15,7 @@ max_grad_norm: 10
 num_envs: ${..env.num_envs}
 buffer_size: 1024
 batch_size: 128
-gradient_steps: 100
+gradient_steps: 20
 train_every: 64
 
 # epsilon

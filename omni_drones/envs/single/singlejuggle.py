@@ -959,8 +959,10 @@ class SingleJuggleVolleyball(IsaacEnv):
         reward_ball_height = 3 * (true_hit & above_min_height_reward).float()  # (E, 1)
         # print("reward_ball_height", reward_ball_height)
         # reward_success_hit = true_hit.any(-1, keepdim=True).float()  # (E, 1)
+
         hit = self.contact_sensor.data.net_forces_w.any(-1).float()
         reward_success_hit = hit.any(-1, keepdim=True).float()  # (E, 1)
+
         # print("reward_success_hit", reward_success_hit)
         step_reward = reward_ball_height + reward_success_hit - penalty_anchor
         # conditional_reward = reward_score - angular_penalty
@@ -969,6 +971,19 @@ class SingleJuggleVolleyball(IsaacEnv):
 
         # reward: torch.Tensor = step_reward + conditional_reward + end_penalty  # (E,2)
         reward: torch.Tensor = step_reward + end_penalty  # (E,2)
+
+
+        score = self.contact_sensor.data.net_forces_w.any(-1).float()
+        self.rpos =  self.ball_pos - self.drone.pos
+        reward_pos = 1 / (1 + torch.norm(self.rpos[..., :2], dim=-1))
+        reward_height = (self.ball_pos[..., 2] - self.drone.pos[..., 2].clip(1.0)).clip(0., 2.)
+        reward_score = score * 3.
+
+        reward: torch.Tensor = reward_pos + 0.8 * reward_height + reward_score
+
+
+
+
 
         if self.stats_cfg.get("reward", False):
             # self.stats["reward_rpos"].add_(reward_rpos.abs().mean(dim=-1, keepdim=True))
@@ -984,7 +999,7 @@ class SingleJuggleVolleyball(IsaacEnv):
 
         misbehave = drone_misbehave.any(-1, keepdim=True) | ball_misbehave # [E, 1]
         truncated = (self.progress_buf >= self.max_episode_length).unsqueeze(-1) # [E, 1]
-        terminated = misbehave | wrong_hit # [E, 1]
+        terminated = misbehave # [E, 1]
         done: torch.Tensor = truncated | terminated # [E, 1]
 
         self.stats["return"].add_(reward.mean(dim=-1, keepdim=True))

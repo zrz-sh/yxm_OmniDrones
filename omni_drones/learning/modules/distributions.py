@@ -248,6 +248,12 @@ class TanhIndependentNormalModule(nn.Module):
         if self.state_dependent_std:
             loc, scale = self.operator(tensor).chunk(2, -1)
             scale = self.scale_mapping(scale).clamp_min(self.scale_lb)
+            # print(f"Scale min: {scale.min().item()}, max: {scale.max().item()}, mean: {scale.mean().item()}")
+            if torch.isnan(scale).any() or torch.isinf(scale).any():
+                print("Warning Scale contains NaN or Inf!")
+            if (scale < 1e-5).any(): # Or a threshold you deem too small
+                print(f"Warning: Scale is very small: {scale[scale < 1e-5]}")
+            return self.dist_cls(loc, scale)
         else:
             loc = self.operator(tensor)
             scale = self.scale_mapping(self.log_std).clamp_min(self.scale_lb)

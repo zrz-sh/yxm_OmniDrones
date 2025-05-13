@@ -17,8 +17,8 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [8, 0., 6.]
-  lookat: [0., 0., 1.]
+  eye: [12., 0., 5.] # [4., 0., 4.]
+  lookat: [0., 0., 0.] # [0., 0., 1.]
 
 usd_path: /home/zelai/projects/OmniDrones/omni_drones/envs/assets/default_environment.usd
 
