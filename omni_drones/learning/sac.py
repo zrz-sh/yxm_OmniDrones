@@ -149,7 +149,7 @@ class SACPolicy(object):
                 next_logp = actor_output[f"{self.agent_spec.name}.logp"]
                 next_qs = self.critic_target(next_state, next_act)
                 next_q = torch.min(next_qs, dim=-1, keepdim=True).values
-                next_q = next_q - self.log_alpha.exp() * next_logp
+                next_q = next_q - (self.log_alpha.exp() + 1e-2) * next_logp
                 target_q = (reward + self.cfg.gamma * (1 - next_dones) * next_q).detach().squeeze(-1)
                 assert not torch.isinf(target_q).any()
                 assert not torch.isnan(target_q).any()
@@ -175,7 +175,7 @@ class SACPolicy(object):
 
                     qs = self.critic(state, act)
                     q = torch.min(qs, dim=-1).values
-                    actor_loss = (self.log_alpha.exp() * logp - q).mean()
+                    actor_loss = ((self.log_alpha.exp() + 1e-2) * logp - q).mean()
                     self.actor_opt.zero_grad()
                     actor_loss.backward()
                     actor_grad_norm = nn.utils.clip_grad_norm_(self.actor.parameters(), self.cfg.max_grad_norm)
@@ -193,7 +193,7 @@ class SACPolicy(object):
                         "actor_loss": actor_loss,
                         "actor_grad_norm": actor_grad_norm,
                         "entropy": -logp.mean(),
-                        "alpha": self.log_alpha.exp().detach(),
+                        "alpha": self.log_alpha.exp().detach() + 1e-2,
                         "log_alpha_grad_norm": log_alpha_grad_norm,
                         "clamped_log_alpha": self.log_alpha.detach(),
                         "alpha_loss": alpha_loss,
