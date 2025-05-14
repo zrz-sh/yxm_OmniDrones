@@ -319,7 +319,7 @@ class SingleJuggleVolleyball(IsaacEnv):
         self.min_height: float = cfg.task.min_height
         self.throttles_in_obs = cfg.task.throttles_in_obs
         self.use_ctbr = True if cfg.task.action_transform=="PIDrate" else False
-        
+        self.reward_shaping = cfg.task.reward_shaping
         super().__init__(cfg, headless)
 
         # x, y, z boundary for drone
@@ -457,7 +457,7 @@ class SingleJuggleVolleyball(IsaacEnv):
                     "agents": CompositeSpec(
                         {
                             "observation": UnboundedContinuousTensorSpec(
-                                (1, observation_dim) # 1 drones
+                                (1, observation_dim) # 2 drones
                             ),
                         }
                     )
@@ -535,6 +535,7 @@ class SingleJuggleVolleyball(IsaacEnv):
                 "truncated": UnboundedContinuousTensorSpec(1),
                 "num_hits": UnboundedContinuousTensorSpec(1),
                 "num_true_hits": UnboundedContinuousTensorSpec(1),
+                "num_height_hits": UnboundedContinuousTensorSpec(1),
                 # "num_hits_is_close": UnboundedContinuousTensorSpec(1),
                 "hit_x": UnboundedContinuousTensorSpec(1),
                 "hit_y": UnboundedContinuousTensorSpec(1),
@@ -580,6 +581,8 @@ class SingleJuggleVolleyball(IsaacEnv):
             _stats_spec.set("penalty_anchor", UnboundedContinuousTensorSpec(1))
             _stats_spec.set("reward_ball_height", UnboundedContinuousTensorSpec(1))
             _stats_spec.set("reward_success_hit", UnboundedContinuousTensorSpec(1))
+            _stats_spec.set("reward_height", UnboundedContinuousTensorSpec(1))
+            _stats_spec.set("reward_pos", UnboundedContinuousTensorSpec(1))
             # _stats_spec.set("reward_score", UnboundedContinuousTensorSpec(1))
             # _stats_spec.set("angular_penalty", UnboundedContinuousTensorSpec(1))
             _stats_spec.set("penalty_wrong_hit", UnboundedContinuousTensorSpec(1))
@@ -587,7 +590,8 @@ class SingleJuggleVolleyball(IsaacEnv):
             _stats_spec.set("penalty_drone_misbehave", UnboundedContinuousTensorSpec(1))
             _stats_spec.set("penalty_ball_misbehave", UnboundedContinuousTensorSpec(1))
             # _stats_spec.set("penalty_expected_ball_h", UnboundedContinuousTensorSpec(1))
-
+        if self.reward_shaping:
+            _stats_spec.set("shaping_reward", UnboundedContinuousTensorSpec(1))
         stats_spec = _stats_spec.expand(self.num_envs).to(self.device)
 
 
@@ -833,7 +837,7 @@ class SingleJuggleVolleyball(IsaacEnv):
             self.stats["done_drone_misbehave"] = drone_misbehave.any(-1, keepdim=True).float()
 
         ball_too_low = self.ball_pos[..., 2] < 0.15  # (E,1)
-        ball_too_high = self.ball_pos[..., 2] > 16  # (E,1)
+        ball_too_high = self.ball_pos[..., 2] > 4.5  # (E,1)
         ball_out_of_boundary = out_of_bounds(self.ball_pos, self.env_boundary_x, self.env_boundary_y)  # (E,1)
         ball_misbehave = ball_too_low | ball_too_high | ball_out_of_boundary # (E,1)
 
@@ -871,6 +875,7 @@ class SingleJuggleVolleyball(IsaacEnv):
         self.num_true_hits += true_hit
         self.ball_current_z_max = torch.max(self.ball_current_z_max, self.ball_pos[..., 2])
         self.ball_z_max += (self.num_true_hits > 1) * true_hit * self.ball_current_z_max
+        true_hit_height = (self.ball_current_z_max > self.min_height) & true_hit & (self.num_true_hits > 1)
         self.ball_current_z_max = torch.logical_not(true_hit) * self.ball_current_z_max
 
         # left_hit = true_hit & (self.turn.unsqueeze(-1) == 0)
@@ -956,50 +961,43 @@ class SingleJuggleVolleyball(IsaacEnv):
         # step_reward = reward_rpos + reward_ball_height - penalty_drone_abs_y - penalty_anchor
         # step_reward = reward_rpos + reward_ball_height - penalty_anchor
         above_min_height_reward = (self.ball_z_max / (self.num_true_hits - 1).clamp(min=1e-5)) > self.min_height
-        reward_ball_height = 3 * (true_hit & above_min_height_reward).float()  # (E, 1)
+        # reward_ball_height = 8 * (true_hit & above_min_height_reward).float()  # (E, 1)
+        reward_ball_height = 8 * (true_hit & above_min_height_reward).float()  # (E, 1)
         # print("reward_ball_height", reward_ball_height)
-        # reward_success_hit = true_hit.any(-1, keepdim=True).float()  # (E, 1)
-
-        hit = self.contact_sensor.data.net_forces_w.any(-1).float()
-        reward_success_hit = hit.any(-1, keepdim=True).float()  # (E, 1)
-
+        reward_success_hit = 2 * true_hit.any(-1, keepdim=True).float()  # (E, 1)
         # print("reward_success_hit", reward_success_hit)
-        step_reward = reward_ball_height + reward_success_hit - penalty_anchor
+        # step_reward = reward_ball_height + reward_success_hit - penalty_anchor
         # conditional_reward = reward_score - angular_penalty
-        # end_penalty = - penalty_wrong_hit - penalty_drone_misbehave - penalty_ball_misbehave
-        end_penalty = - penalty_drone_misbehave - penalty_ball_misbehave
-
-        # reward: torch.Tensor = step_reward + conditional_reward + end_penalty  # (E,2)
-        reward: torch.Tensor = step_reward + end_penalty  # (E,2)
-
-
-        score = self.contact_sensor.data.net_forces_w.any(-1).float()
+        end_penalty = - penalty_wrong_hit - penalty_drone_misbehave - penalty_ball_misbehave
         self.rpos =  self.ball_pos - self.drone.pos
         reward_pos = 1 / (1 + torch.norm(self.rpos[..., :2], dim=-1))
         reward_height = (self.ball_pos[..., 2] - self.drone.pos[..., 2].clip(1.0)).clip(0., 2.)
-        reward_score = score * 3.
-
-        reward: torch.Tensor = reward_pos + 0.8 * reward_height + reward_score
-
-
-
-
+        shaping_reward = reward_pos + 0.5 * reward_height
+        # reward: torch.Tensor = reward_ball_height + reward_success_hit + shaping_reward + end_penalty
+        if self.reward_shaping:
+            reward: torch.Tensor = reward_ball_height + reward_success_hit + shaping_reward + end_penalty
+        else:
+            reward: torch.Tensor = reward_ball_height + reward_success_hit + end_penalty
 
         if self.stats_cfg.get("reward", False):
             # self.stats["reward_rpos"].add_(reward_rpos.abs().mean(dim=-1, keepdim=True))
             self.stats["penalty_anchor"].add_(penalty_anchor.mean(dim=-1, keepdim=True))
             self.stats["reward_ball_height"].add_(reward_ball_height.mean(dim=-1, keepdim=True))
             self.stats["reward_success_hit"].add_(reward_success_hit.mean(dim=-1, keepdim=True))
+            self.stats["reward_height"].add_(reward_height.mean(dim=-1, keepdim=True))
+            self.stats["reward_pos"].add_(reward_pos.mean(dim=-1, keepdim=True))
             # self.stats["reward_score"].add_(reward_score.mean(dim=-1, keepdim=True))
             # self.stats["angular_penalty"].add_(angular_penalty.mean(dim=-1, keepdim=True))
             self.stats["penalty_wrong_hit"].add_(penalty_wrong_hit.mean(dim=-1, keepdim=True))
             # self.stats["penalty_drone_abs_y"].add_(penalty_drone_abs_y.mean(dim=-1, keepdim=True))
             self.stats["penalty_drone_misbehave"].add_(penalty_drone_misbehave.mean(dim=-1, keepdim=True))
             self.stats["penalty_ball_misbehave"].add_(penalty_ball_misbehave.mean(dim=-1, keepdim=True))
+        if self.reward_shaping:
+            self.stats["shaping_reward"].add_(shaping_reward.mean(dim=-1, keepdim=True))
 
         misbehave = drone_misbehave.any(-1, keepdim=True) | ball_misbehave # [E, 1]
         truncated = (self.progress_buf >= self.max_episode_length).unsqueeze(-1) # [E, 1]
-        terminated = misbehave # [E, 1]
+        terminated = misbehave | wrong_hit # [E, 1]
         done: torch.Tensor = truncated | terminated # [E, 1]
 
         self.stats["return"].add_(reward.mean(dim=-1, keepdim=True))
@@ -1028,7 +1026,7 @@ class SingleJuggleVolleyball(IsaacEnv):
 
         self.stats["num_hits"].add_(hit.float())
         self.stats["num_true_hits"].add_(true_hit.float())
-
+        self.stats["num_height_hits"].add_(true_hit_height.float())
         self.stats["hit_x"] = self.hit_pos[:, 0].unsqueeze(-1) / self.num_true_hits.clamp(min=1e-5)
         self.stats["hit_y"] = self.hit_pos[:, 1].unsqueeze(-1) / self.num_true_hits.clamp(min=1e-5)
         self.stats["hit_z"] = self.hit_pos[:, 2].unsqueeze(-1) / self.num_true_hits.clamp(min=1e-5)

@@ -25,7 +25,7 @@ import torch
 import torch.distributions as D
 
 import omni.isaac.core.utils.prims as prim_utils
-
+import omni_drones.utils.kit as kit_utils
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
 from omni_drones.robots.drone import MultirotorBase
 from omni_drones.views import ArticulationView, RigidPrimView
@@ -166,13 +166,13 @@ class Hover(IsaacEnv):
         self.alpha = 0.8
 
     def _design_scene(self):
-        import omni_drones.utils.kit as kit_utils
-        import omni.isaac.core.utils.prims as prim_utils
-
-        drone_model_cfg = self.cfg.task.drone_model
-        self.drone, self.controller = MultirotorBase.make(
-            drone_model_cfg.name, drone_model_cfg.controller
-        )
+        drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
+        cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
+        self.drone: MultirotorBase = drone_model(cfg=cfg)
+        # drone_model_cfg = self.cfg.task.drone_model
+        # self.drone, self.controller = MultirotorBase.make(
+        #     drone_model_cfg.name, drone_model_cfg.controller
+        # )
 
         target_vis_prim = prim_utils.create_prim(
             prim_path="/World/envs/env_0/target",
@@ -180,24 +180,29 @@ class Hover(IsaacEnv):
             translation=(0.0, 0.0, 2.),
         )
 
-        kit_utils.set_nested_collision_properties(
-            target_vis_prim.GetPath(),
-            collision_enabled=False
-        )
-        kit_utils.set_nested_rigid_body_properties(
-            target_vis_prim.GetPath(),
-            disable_gravity=True
-        )
 
-        kit_utils.create_ground_plane(
-            "/World/defaultGroundPlane",
-            static_friction=1.0,
-            dynamic_friction=1.0,
-            restitution=0.0,
-        )
-        drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 2.)])[0]
-        if self.has_payload:
-            attach_payload(drone_prim.GetPath().pathString)
+        if self.usd_path:
+            # use local usd resources
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+                usd_path=self.usd_path
+            )
+        else:
+            # use online usd resources
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+            )
+        drone_prims = self.drone.spawn(translations=[(0.0, 0.0, 2.0)])
+
+        # drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 2.)])[0]
+        # if self.has_payload:
+        #     attach_payload(drone_prim.GetPath().pathString)
         return ["/World/defaultGroundPlane"]
 
     def _set_specs(self):
